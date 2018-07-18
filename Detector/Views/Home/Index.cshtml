@@ -1,0 +1,47 @@
+﻿@model Detector.ViewModels.HomeViewModel
+@{
+	ViewBag.Title = "Index";
+	Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<h1>Detection Classes</h1>
+
+<table class="table table-bordered table-responsive table-hover">
+
+	@foreach (var brand in Model.brands)
+	{
+	<tr>
+		<td>@brand.Name</td>
+		<td>
+			@Html.ActionLink("Train", "Train", "Brand", new { id = brand.id, name = brand.Name }, new { @class = "trainBtn" })
+
+			@{
+				string id = "spinner-" + brand.Name;
+			}
+			<img id=@id class="hidden" src="@Url.Content("~/Content/img/spinner-small.gif")" />
+		</td>
+		<td>@Html.ActionLink("Edit", "Edit", "Brand", new { id = brand.id }, null)</td>
+		<td>
+			@Html.ActionLink("Delete", "Delete", "Brand", new { id = brand.id }, null)
+		</td>
+	</tr>
+
+	}
+	<tr>
+		<td>@Html.ActionLink("New", "New", "Brand")</td>
+		<td><a class="test-ajax">test ajax</a></td>
+		<td><span class="test-ajax-output"></span></td>
+		<td></td>
+	</tr>
+</table>
+
+<div class="container-fluid-nopad">
+
+
+	<div class="row">
+		<div class="col-xs-3">
+			<button class="fill-width">See Tensorboard Performance Graphs</button>
+		</div>
+
+	</div>
+</div>

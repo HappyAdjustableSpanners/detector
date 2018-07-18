@@ -1,0 +1,43 @@
+﻿@model Detector.ViewModels.BrandFormViewModel
+@{
+	/**/
+
+	/**/
+
+	ViewBag.Title = "New";
+	Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<h2>New Brand</h2>
+
+@using (Html.BeginForm("Save", "Brand", FormMethod.Post, new { encType = "multipart/form-data" }))
+{
+	//@Html.HiddenFor(model => model.brand.id, new { id = "-1" })
+	<div class="form-group">
+		@Html.LabelFor(m => m.brand.Name)
+		@Html.TextBoxFor(m => m.brand.Name, new { @class = "form-control" })
+		@Html.ValidationMessageFor(m => m.brand.Name)
+	</div>
+
+	<div class="form-group">
+		@Html.TextBoxFor(m => m.brand.trainingImages, new { type = "file", name = "trainingImages", multiple = "multiple" })<br /><br />
+		@Html.ValidationMessageFor(m => m.brand.trainingImages)
+	</div>
+
+	@*var imgDir = Server.MapPath("~/Storage/training-images/") + Model.brand.Name;
+		<div class="form-group">
+			@foreach (var imgPath in Directory.GetFiles(imgDir, "*.jpg"))
+			{
+				var img = new FileInfo(imgPath);
+
+				<img src= @Url.Content(imgDir + "\\" + img.Name)  />
+			}
+		</div>*@
+
+	<button type="submit" class="btn btn-primary">Save</button>
+}
+
+<script src="~/Scripts/jquery-1.10.2.js"></script>
+<script src="~/Scripts/jquery.validate.js"></script>
+<script src="~/Scripts/jquery.validate.unobtrusive.js"></script>
+

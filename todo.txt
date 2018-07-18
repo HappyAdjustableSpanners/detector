@@ -1,0 +1,3 @@
+prevent duplicate brand name being forbidden when EDIT form.
+
+Only want to check modified fields
