@@ -33,4 +33,7 @@ textarea {
 .input-validation-error {
 	border: 2px solid;
 }
+.spinner {
+	max-width: 30px;
+}
 

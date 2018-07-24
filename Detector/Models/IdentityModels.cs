@@ -21,6 +21,8 @@ namespace Detector.Models
     public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         public DbSet<Brand> brands { get; set; }
+        public DbSet<BrandJob> brandJobs { get; set; }
+        public DbSet<BrandProcess> brandProcesses { get; set; }
         public ApplicationDbContext()
             : base("DefaultConnection", throwIfV1Schema: false)
         {

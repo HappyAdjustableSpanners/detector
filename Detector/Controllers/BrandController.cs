@@ -8,6 +8,10 @@ using Detector.Models;
 using System.IO;
 using System.Diagnostics;
 using System.Xml;
+using Hangfire;
+using System.Web.Security;
+using Microsoft.AspNet.Identity;
+using Ionic.Zip;
 
 namespace Detector.Controllers
 {
@@ -17,6 +21,7 @@ namespace Detector.Controllers
 
         public ViewResult New()
         {
+            
             return View("BrandForm");
         }
 
@@ -39,12 +44,15 @@ namespace Detector.Controllers
                 return RedirectToAction("New");
             }
 
-            if(brand.id == 0)
+            if (brand.id == 0)
+            {
+                var id = User.Identity.GetUserId();
+                brand.userId = id;
                 _context.brands.Add(brand);
+            }
             else
             {
                 var brandInDb = _context.brands.Single(b => b.id == brand.id);
-
                 brandInDb.Name = brand.Name;
                 brandInDb.trainingImages = brand.trainingImages;
             }
@@ -53,21 +61,25 @@ namespace Detector.Controllers
             SaveTrainingImages(brand);
 
             // Set up test and train subdirectories
-            Directory.CreateDirectory(Server.MapPath(String.Format("~/Storage/{0}/data", brand.Name)));
-            Directory.CreateDirectory(Server.MapPath(String.Format("~/Storage/{0}/data/data", brand.Name)));
-            Directory.CreateDirectory(Server.MapPath(String.Format("~/Storage/{0}/data/training", brand.Name)));
-            Directory.CreateDirectory(Server.MapPath(String.Format("~/Storage/{0}/training-images-augmented/test/", brand.Name)));
-            Directory.CreateDirectory(Server.MapPath(String.Format("~/Storage/{0}/training-images-augmented/train/", brand.Name)));
+            Directory.CreateDirectory(Server.MapPath(String.Format("~/Storage/{0}/data", brand.id)));
+            Directory.CreateDirectory(Server.MapPath(String.Format("~/Storage/{0}/data/data", brand.id)));
+            Directory.CreateDirectory(Server.MapPath(String.Format("~/Storage/{0}/data/graph", brand.id)));
+            Directory.CreateDirectory(Server.MapPath(String.Format("~/Storage/{0}/data/training", brand.id)));
+            Directory.CreateDirectory(Server.MapPath(String.Format("~/Storage/{0}/data/trainingoutput", brand.id)));
+            Directory.CreateDirectory(Server.MapPath(String.Format("~/Storage/{0}/training-images-augmented/test/", brand.id)));
+            Directory.CreateDirectory(Server.MapPath(String.Format("~/Storage/{0}/training-images-augmented/train/", brand.id)));
+            Directory.CreateDirectory(Server.MapPath(String.Format("~/Storage/{0}/training-images-augmented/debug/", brand.id)));
+
 
             // Copy the model starting point
             string SourcePath =Server.MapPath("~/tf_model/faster_rcnn_inception_v2_coco_2017_11_08");
-            string DestPath = Server.MapPath(String.Format("~/Storage/{0}/data/faster_rcnn_inception_v2_coco_2017_11_08", brand.Name));
-            Directory.CreateDirectory(Server.MapPath(String.Format("~/Storage/{0}/data/faster_rcnn_inception_v2_coco_2017_11_08", brand.Name)));
+            string DestPath = Server.MapPath(String.Format("~/Storage/{0}/data/faster_rcnn_inception_v2_coco_2017_11_08", brand.id));
+            Directory.CreateDirectory(Server.MapPath(String.Format("~/Storage/{0}/data/faster_rcnn_inception_v2_coco_2017_11_08", brand.id)));
             Copy(SourcePath, DestPath);
 
             //Copy the model config
             SourcePath = Server.MapPath("~/tf_model/training/faster_rcnn_inception_v2_coco.config");
-            DestPath = Server.MapPath(String.Format("~/Storage/{0}/data/training/faster_rcnn_inception_v2_coco.config", brand.Name));
+            DestPath = Server.MapPath(String.Format("~/Storage/{0}/data/training/faster_rcnn_inception_v2_coco.config", brand.id));
             System.IO.File.Copy(SourcePath, DestPath);
 
             return RedirectToAction("Index", "Home");
@@ -101,13 +113,26 @@ namespace Detector.Controllers
             }
         }
 
+        public ActionResult DownloadGraph(int id)
+        {
+            // get the location of the graph for this id
+            string path = Server.MapPath(String.Format("~/Storage/{0}/data/graph/", id));
+
+            using (ZipFile zip = new ZipFile())
+            {
+                zip.AddDirectory(path);
+                zip.Save(path + "/graph.zip");
+                return File(path + "/graph.zip", "application/zip", "graph.zip");
+            }
+        }
+
         private void SaveTrainingImages(Brand brand)
         {
             // Save training images
             foreach (var image in brand.trainingImages)
             {
                 // create dir 
-                DirectoryInfo outDir = Directory.CreateDirectory(Server.MapPath("~/Storage/" + brand.Name + "/training-images/"));
+                DirectoryInfo outDir = Directory.CreateDirectory(Server.MapPath(String.Format("~/Storage/{0}/training-images/", brand.id)));
 
                 string filename = image.FileName;
                 int lastSlash = filename.LastIndexOf("\\");
@@ -117,26 +142,30 @@ namespace Detector.Controllers
             }
         }
 
-        // Not using this anymore. Trying to find a more elegant solution to preventing brands with same name from being created with validation
-        [AllowAnonymous]
-        public JsonResult IsNameExists([Bind(Prefix = "brand.Name")] string Name, [Bind(Prefix = "brand.id")] int id)
+        private void killProcessesForBrand(int brandId)
         {
-            // if we are not editing
-
-            // if any brand has the same name, but a different id
-            var result = Json(_context.brands.Where(b => b.Name == Name && b.id != id), JsonRequestBehavior.AllowGet);
-            //var result = Json(!_context.brands.Any(x => x.Name == Name), JsonRequestBehavior.AllowGet);
-            return result;
+            string workingDir = String.Format("/Storage/{0}/data", brandId);
+            var processes = Process.GetProcessesByName("pythonw");
+            foreach ( var proc in processes) 
+            {
+               
+                if(proc.StartInfo.WorkingDirectory.ToString().Contains(workingDir))
+                {
+                    proc.Kill();
+                    
+                }
+            }
         }
 
-        private void run_python_cmd(string cmd, string args, string workingDir = "")
+        private void run_python_cmd(string cmd, string args, int brandId, string workingDir = "")
         {
             ProcessStartInfo start = new ProcessStartInfo();
             start.FileName = "C:\\Users\\jonny\\Miniconda3\\pythonw.exe";
             start.Arguments = string.Format("{0} {1}", cmd, args);
-            start.UseShellExecute = false;
-            start.RedirectStandardOutput = true;
-            start.RedirectStandardError = true;
+            
+            //start.UseShellExecute = false;
+            //start.RedirectStandardOutput = true;
+            //start.RedirectStandardError = true;
 
             if (!string.IsNullOrEmpty(workingDir))
             {
@@ -144,139 +173,272 @@ namespace Detector.Controllers
             }
             using (Process process = Process.Start(start))
             {
-                using (StreamReader reader = process.StandardOutput)
-                {
-                    string result = reader.ReadToEnd();
-                    Console.Write(result);
-                }
-                using (StreamReader reader = process.StandardError)
-                {
-                    string result = reader.ReadToEnd();
-                    Console.Write(result);
-                }
+
+                AddBrandProcess(brandId, process.Id);
+                //process.StartInfo.Verb = "test";
+                //using (StreamReader reader = process.StandardOutput)
+                //{
+                //    string result = reader.ReadToEnd();
+                //    Console.Write(result);
+                //}
+                //using (StreamReader reader = process.StandardError)
+                //{
+                //    string result = reader.ReadToEnd();
+                //    Console.Write(result);
+                //}
+
                 process.WaitForExit();
             }
         }
 
-        private void run_python_cmd_async(string cmd, string args, string brandName, string workingDir = "")
+        private void AddBrandProcess(int brandId, int processId)
         {
-            ProcessStartInfo start = new ProcessStartInfo();
-            start.FileName = "C:\\Users\\jonny\\Miniconda3\\pythonw.exe";
-            start.Arguments = string.Format("{0} {1}", cmd, args);
-            start.CreateNoWindow = true;
-
-            if (!string.IsNullOrEmpty(workingDir))
-            {
-                start.WorkingDirectory = workingDir;
-            }
-
-            Process process = new Process();
-            process.EnableRaisingEvents = true;
-            process.StartInfo = start;
-            process.Exited += (sender, e) => p_Exited(sender, e, brandName); ;
-            process.Start();
+           // BrandProcess brandProcess = new BrandProcess();
+            //brandProcess
         }
 
-        void p_Exited(object sender, System.EventArgs e, string brandName)
+        public JsonResult Status()
         {
-            Console.Write("exited");
-            ExportGraph(brandName);
+            // work out what status is for each brand
+            string userId = User.Identity.GetUserId();
+            List<Brand> brands = _context.brands.Where(b => b.userId == userId).ToList();
+            List<string> statuses = new List<string>();
+
+            for(int i = 0; i < brands.Count; i++)
+            {
+                // get dir for brand
+                string baseDir = Server.MapPath(String.Format("~/Storage/{0}/", brands[i].id));
+                string augDir = baseDir + "training-images-augmented\\test";
+                string tfRecordDir = baseDir + "data\\data\\train.record";
+                string trainDir = baseDir + "data\\trainingoutput";
+                string graphDir = baseDir + "data\\graph";
+
+                string status = "trained";
+                bool graphExists = false;
+
+                bool tfRecordFilesExist = System.IO.File.Exists(tfRecordDir);
+
+
+                if(Directory.Exists(augDir))
+                {
+                    // if aug dir is empty and we don't have tfrecords yet, we are untrained
+                    if (IsDirectoryEmpty(augDir) && !tfRecordFilesExist)
+                    {
+                        status = "untrained";
+                    }
+
+                    // if aug dir is not empty but we don't have tfrecords yet, we are generating augs
+                    if (!IsDirectoryEmpty(augDir) && !tfRecordFilesExist)
+                    {
+                        status = "generating-augs";
+                    }
+                }
+
+                if(System.IO.File.Exists(tfRecordDir))
+                {
+                    // if tfrecord file exists but graph does not, we are training
+                    if(tfRecordFilesExist && IsDirectoryEmpty(graphDir) )
+                    {
+                        status = "training";
+                    }
+                    
+                }
+
+                statuses.Add(brands[i].id + " " + status);
+                
+            }
+
+            return Json(statuses, JsonRequestBehavior.AllowGet);
+        }
+
+        public bool IsDirectoryEmpty(string path)
+        {
+            IEnumerable<string> items = Directory.EnumerateFileSystemEntries(path);
+            using (IEnumerator<string> en = items.GetEnumerator())
+            {
+                return !en.MoveNext();
+            }
+        }
+
+        private void CleanForBrand(int id)
+        {
+            ClearDir(String.Format(Server.MapPath("~/Storage/{0}/data/trainingoutput"), id));
+            ClearDir(String.Format(Server.MapPath("~/Storage/{0}/training-images-augmented/test"), id));
+            ClearDir(String.Format(Server.MapPath("~/Storage/{0}/training-images-augmented/train"), id));
+            ClearDir(String.Format(Server.MapPath("~/Storage/{0}/training-images-augmented"), id), false);
+            ClearDir(String.Format(Server.MapPath("~/Storage/{0}/data/data"), id));
+            ClearDir(String.Format(Server.MapPath("~/Storage/{0}/data/graph"), id));
         }
 
         public ActionResult Train(int id, string name)
         {
-            // Steps to take before training
-            // Augment images
-            // Convert xml to csv
-            // Generate TFRecords
+            StopJobsForBrand(id);
+            CleanForBrand(id);
 
-            // Set up a folder for this brands augmented images
-            string dir = String.Format("~/Storage/{0}/training-images-augmented", name);
-            DirectoryInfo augDir = Directory.CreateDirectory(Server.MapPath(dir));
-
-          
-
-            GenerateImgAugmentations(name);
-            ConvertXMLtoCSV(name);
-            GenerateTFRecords(name);
-            CreateLabelPbTextFile(name);
-            StartTraining(name);
+            var startTimeSpan = TimeSpan.Zero;
+            var periodTimeSpan = TimeSpan.FromSeconds(1);   
+            CreateLabelPbTextFile(name, id);
+      
+            var job1 = GenerateImgAugmentations(name, id);
+            var job2 = ConvertXMLtoCSV(id, job1 );
+            var job3 = GenerateTFRecords(id, name, job2);
+            var job4 = StartTraining(id, job3);
+            var job5 = ExportGraph(id, job4);
+            AddBrandJob(job1, id);
            
-            // Lame
+            AddBrandJob(job2, id);
+            AddBrandJob(job3, id);
+            AddBrandJob(job4, id);
+            AddBrandJob(job5, id);
 
-
-           return RedirectToAction("Index", "Home");
+            return RedirectToAction("Index", "Home");
         }
 
-        private void ExportGraph(string brandName)
+        private void StopJobsForBrand(int brandId)
         {
-            string cmd = Server.MapPath("~/tf_model/research/object_detection/export_inference_graph.py");
-            string workingDir = Server.MapPath(String.Format("~/Storage/{0}/data", brandName));
-            string args = String.Format("--input_type image_tensor --pipeline_config_path training/faster_rcnn_inception_v2_coco.config --trained_checkpoint_prefix training/model.ckpt-10 --output_directory graph", brandName);
-            run_python_cmd(cmd, args, workingDir);
+            killProcessesForBrand(brandId);
+
+            // get all jobs for a brand
+            List<BrandJob> jobs = _context.brandJobs.Where(j => j.brandId == brandId).ToList();
+
+            // destroy their background jobs and remove them from brandjob table
+            foreach (BrandJob j in jobs)
+            {
+                BackgroundJob.Delete(j.jobId);
+                
+                _context.brandJobs.Remove(j);
+            }
+
+            _context.SaveChanges();
         }
 
-        private void StartTraining(string brandName)
+        private void AddBrandJob(string jobId, int brandId)
         {
-            string cmd = Server.MapPath("~/tf_model/research/object_detection/train.py");
-            string args = "--logtostderr --train_dir=training/ --pipeline_config_path=training/faster_rcnn_inception_v2_coco.config";
-            string workingDir = Server.MapPath(String.Format("~/Storage/{0}/data", brandName ));
-            run_python_cmd_async(cmd, args, brandName, workingDir);
+            var brandJob = new BrandJob();
+            brandJob.brandId = brandId;
+            brandJob.jobId = jobId;
+            _context.brandJobs.Add(brandJob);
+            _context.SaveChanges();
         }
 
-        private void CreateLabelPbTextFile(string brandName)
+        private void ClearDir(string directory, bool recursive = true)
+        {
+            System.IO.DirectoryInfo di = new DirectoryInfo(directory);
+
+            if (Directory.Exists(directory))
+            {
+                foreach (FileInfo file in di.GetFiles())
+                {
+                    file.Delete();
+                }
+                if (recursive)
+                {
+                    foreach (DirectoryInfo dir in di.GetDirectories())
+                    {
+                        dir.Delete(true);
+                    }
+                }
+            }
+
+            
+        }
+      
+        private void CreateLabelPbTextFile(string brandName, int id)
         {
             string[] lines = { "item {", "id: 1", String.Format("name: '{0}'", brandName), "}" };
-            System.IO.File.WriteAllLines(Server.MapPath(String.Format("~/Storage/{0}/data/data/object-detection.pbtxt", brandName)), lines);
+            System.IO.File.WriteAllLines(Server.MapPath(String.Format("~/Storage/{0}/data/data/object-detection.pbtxt", id)), lines);
         }
         
-        private void GenerateTFRecords(string brandName)
+        private string GenerateImgAugmentations(string name, int id)
         {
-            string cmd = Server.MapPath("~/python/generate-tfrecord.py");
-            string args = String.Format("--csv_input={0} --output_path={1} --brandName={2} --imagePath={3}", Server.MapPath(String.Format("~/Storage/{0}/data/data/test_labels.csv", brandName)), Server.MapPath(String.Format("~/Storage/{0}/data/data/test.record", brandName)), brandName, Server.MapPath(String.Format("~/Storage/{0}/training-images-augmented", brandName)));
-            run_python_cmd(cmd, args);
-            args = String.Format("--csv_input={0} --output_path={1} --brandName={2} --imagePath={3}", Server.MapPath(String.Format("~/Storage/{0}/data/data/train_labels.csv", brandName)), Server.MapPath(String.Format("~/Storage/{0}/data/data/train.record", brandName)), brandName, Server.MapPath(String.Format("~/Storage/{0}/training-images-augmented", brandName)));
-            run_python_cmd(cmd, args);
+            string outPath = Server.MapPath(String.Format("~/Storage/{0}/training-images-augmented/", id));
+            string inPath = Server.MapPath(String.Format("~/Storage/{0}/training-images/", id));
+            string cmd = Server.MapPath("~/imgaug/generate_augs.py");
+            string args = outPath + " " + inPath + " " + name;
+            string workingDir = Server.MapPath(String.Format("~/Storage/{0}/", id));
+            var jobId = BackgroundJob.Enqueue(() => ImgAugJob(cmd, args, id, workingDir, JobCancellationToken.Null));            
+            return jobId;
         }
 
-        private void ConvertXMLtoCSV(string brandName)
+        private string ConvertXMLtoCSV(int id, string lastJob)
         {
             string cmd = Server.MapPath("~/python/xml-to-csv.py");
-            string csvOutPath = Server.MapPath(String.Format("~/Storage/{0}/data/data", brandName));
-            string annotationPath = Server.MapPath(String.Format("~/Storage/{0}/training-images-augmented", brandName));
-            string args = String.Format("--annotationPath={0} --outputPath={1}", annotationPath, csvOutPath);
-
-            run_python_cmd(cmd, args);
-
-            // Get all xml files
-            //string[] test = System.IO.Directory.GetFiles(Server.MapPath(String.Format("~/Storage/{0}/training-images-augmented/test", brandName)), "*.xml");
-            //string[] train = System.IO.Directory.GetFiles(Server.MapPath(String.Format("~/Storage/{0}/training-images-augmented/train", brandName)), "*.xml");
-
-            // foreach test file, find all the object tags
-
+            string outPath = Server.MapPath(String.Format("~/Storage/{0}/data/data", id));
+            string inPath = Server.MapPath(String.Format("~/Storage/{0}/training-images-augmented", id));
+            string args = String.Format("--annotationPath={0} --outputPath={1}", inPath, outPath);
+            string workingDir = Server.MapPath(String.Format("~/Storage/{0}/", id));
+            var jobId = BackgroundJob.ContinueWith(lastJob, () => XmlToCsvJob(cmd, args, id, workingDir,JobCancellationToken.Null));
+            return jobId;
         }
 
-        private void GenerateImgAugmentations(string brandName)
+        private string GenerateTFRecords(int id, string brandName, string lastJob)
         {
-            // Assign the in and out path for the augmentation script
-            string augOutPath = Server.MapPath(String.Format("~/Storage/{0}/training-images-augmented/", brandName));
-            string inPath = Server.MapPath(String.Format("~/Storage/{0}/training-images/", brandName));
-           
-            // Call imgaug
-            string args = augOutPath + " " + inPath + " " + brandName;
-            string cmd = Server.MapPath("~/imgaug/generate_augs.py");
-            run_python_cmd(cmd, args);
+            string cmd = Server.MapPath("~/python/generate-tfrecord.py");
+            string args = String.Format("--csv_input={0} --output_path={1} --brandName={2} --imagePath={3}", Server.MapPath(String.Format("~/Storage/{0}/data/data/test_labels.csv", id)), Server.MapPath(String.Format("~/Storage/{0}/data/data/test.record", id)), brandName, Server.MapPath(String.Format("~/Storage/{0}/training-images-augmented", id)));
+            string workingDir = Server.MapPath(String.Format("~/Storage/{0}/", id));
+            var jobId1 = BackgroundJob.ContinueWith(lastJob, () => GenerateTFRecordsJob(cmd, args, id, workingDir, JobCancellationToken.Null));
+            lastJob = jobId1;
+            args = String.Format("--csv_input={0} --output_path={1} --brandName={2} --imagePath={3}", Server.MapPath(String.Format("~/Storage/{0}/data/data/train_labels.csv", id)), Server.MapPath(String.Format("~/Storage/{0}/data/data/train.record", id)), brandName, Server.MapPath(String.Format("~/Storage/{0}/training-images-augmented", id)));
+            var jobId2 = BackgroundJob.ContinueWith(lastJob, () => GenerateTFRecordsJob(cmd, args, id, workingDir, JobCancellationToken.Null));
+            return jobId2;
+        }
+
+        private string StartTraining(int id, string lastJob)
+        {
+            string cmd = Server.MapPath("~/tf_model/research/object_detection/train.py");
+            string args = "--logtostderr --train_dir=trainingoutput/ --pipeline_config_path=training/faster_rcnn_inception_v2_coco.config";
+            string workingDir = Server.MapPath(String.Format("~/Storage/{0}/data", id));
+            //run_python_cmd_async(cmd, args, brandName, workingDir);
+            var jobId = BackgroundJob.ContinueWith(lastJob, () => TrainJob(cmd, args, id, workingDir, JobCancellationToken.Null));
+            return jobId;
+        }
+
+        private string ExportGraph(int id, string lastJob)
+        {
+            int numSteps = 10;
+            string cmd = Server.MapPath("~/tf_model/research/object_detection/export_inference_graph.py");
+            string workingDir = Server.MapPath(String.Format("~/Storage/{0}/data", id));
+            string args = String.Format("--input_type image_tensor --pipeline_config_path training/faster_rcnn_inception_v2_coco.config --trained_checkpoint_prefix trainingoutput/model.ckpt-{0} --output_directory graph", numSteps.ToString());
+            var jobId = BackgroundJob.ContinueWith(lastJob, () => ExportGraphJob(cmd, args, id, workingDir, JobCancellationToken.Null));
+            return jobId;
+        }
+
+        // hangfire jobs
+        public void ImgAugJob(string cmdPath, string args, int brandId, string workingDir, IJobCancellationToken ct)
+        {        
+            run_python_cmd(cmdPath, args, brandId, workingDir);
+        }
+        public void XmlToCsvJob(string cmdPath, string args, int brandId, string workingDir, IJobCancellationToken ct)
+        {
+            run_python_cmd(cmdPath, args, brandId, workingDir);
+        }
+        public void GenerateTFRecordsJob(string cmdPath, string args, int brandId, string workingDir, IJobCancellationToken ct)
+        {
+            run_python_cmd(cmdPath, args, brandId, workingDir);
+        }
+        public void TrainJob(string cmdPath, string args, int brandId, string workingDir, IJobCancellationToken ct)
+        {
+            run_python_cmd(cmdPath, args, brandId, workingDir);
+        }
+        public void ExportGraphJob(string cmdPath, string args, int brandId, string workingDir, IJobCancellationToken ct)
+        {
+            run_python_cmd(cmdPath, args, brandId, workingDir);
         }
 
         public ActionResult Delete(int id)
         {
+            // stop all jobs relating to this brand before we delete
+            StopJobsForBrand(id);
+            
             var brand = _context.brands.SingleOrDefault(c => c.id == id);
             _context.brands.Remove(brand);
             _context.SaveChanges();
 
             // also remove stored data for that brand
-            string path = Server.MapPath(String.Format("~/Storage/{0}/", brand.Name));
+            string path = Server.MapPath(String.Format("~/Storage/{0}/", id));
+            ClearDir(path, true);
             Directory.Delete(path, true);
+
 
             return RedirectToAction("Index", "Home");
         }

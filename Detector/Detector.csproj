@@ -46,6 +46,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="DotNetZip, Version=1.11.0.0, Culture=neutral, PublicKeyToken=6583c7c814667745, processorArchitecture=MSIL">
+      <HintPath>..\packages\DotNetZip.1.11.0\lib\net20\DotNetZip.dll</HintPath>
+    </Reference>
     <Reference Include="Hangfire.Core, Version=1.6.19.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Hangfire.Core.1.6.19\lib\net45\Hangfire.Core.dll</HintPath>
     </Reference>
@@ -212,8 +215,26 @@
     <Compile Include="Migrations\201806271010343_Changed mode names.Designer.cs">
       <DependentUpon>201806271010343_Changed mode names.cs</DependentUpon>
     </Compile>
+    <Compile Include="Migrations\201807191240269_add user id to brand.cs" />
+    <Compile Include="Migrations\201807191240269_add user id to brand.Designer.cs">
+      <DependentUpon>201807191240269_add user id to brand.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Migrations\201807240841491_hangfire table.cs" />
+    <Compile Include="Migrations\201807240841491_hangfire table.Designer.cs">
+      <DependentUpon>201807240841491_hangfire table.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Migrations\201807240846554_changed brand job id from int to string.cs" />
+    <Compile Include="Migrations\201807240846554_changed brand job id from int to string.Designer.cs">
+      <DependentUpon>201807240846554_changed brand job id from int to string.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Migrations\201807241440513_added BrandProcess table.cs" />
+    <Compile Include="Migrations\201807241440513_added BrandProcess table.Designer.cs">
+      <DependentUpon>201807241440513_added BrandProcess table.cs</DependentUpon>
+    </Compile>
     <Compile Include="Migrations\Configuration.cs" />
     <Compile Include="Models\AccountViewModels.cs" />
+    <Compile Include="Models\BrandJob.cs" />
+    <Compile Include="Models\BrandProcess.cs" />
     <Compile Include="Models\IdentityModels.cs" />
     <Compile Include="Models\ManageViewModels.cs" />
     <Compile Include="Models\Brand.cs" />
@@ -223,9 +244,13 @@
     <Compile Include="ViewModels\BrandFormViewModel.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Content\boostrap-flatly.css" />
     <Content Include="Content\bootstrap.css" />
     <Content Include="Content\bootstrap.min.css" />
+    <Content Include="Content\img\bootstrap-flatly.min.css" />
     <Content Include="Content\main.js" />
+    <Content Include="Content\united.css" />
+    <Content Include="Content\united.min.css" />
     <Content Include="favicon.ico" />
     <Content Include="fonts\glyphicons-halflings-regular.svg" />
     <Content Include="Global.asax" />
@@ -284,7 +309,6 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="App_Data\" />
-    <Folder Include="Content\img\" />
     <Folder Include="Views\Test\" />
   </ItemGroup>
   <ItemGroup>
@@ -306,6 +330,18 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Migrations\201806271010343_Changed mode names.resx">
       <DependentUpon>201806271010343_Changed mode names.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Migrations\201807191240269_add user id to brand.resx">
+      <DependentUpon>201807191240269_add user id to brand.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Migrations\201807240841491_hangfire table.resx">
+      <DependentUpon>201807240841491_hangfire table.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Migrations\201807240846554_changed brand job id from int to string.resx">
+      <DependentUpon>201807240846554_changed brand job id from int to string.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Migrations\201807241440513_added BrandProcess table.resx">
+      <DependentUpon>201807241440513_added BrandProcess table.cs</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
   <PropertyGroup>

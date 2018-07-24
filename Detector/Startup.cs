@@ -1,5 +1,6 @@
 ﻿using Microsoft.Owin;
 using Owin;
+using Hangfire;
 
 [assembly: OwinStartupAttribute(typeof(Detector.Startup))]
 namespace Detector
@@ -8,6 +9,7 @@ namespace Detector
     {
         public void Configuration(IAppBuilder app)
         {
+            app.UseHangfireDashboard();
             ConfigureAuth(app);
         }
     }

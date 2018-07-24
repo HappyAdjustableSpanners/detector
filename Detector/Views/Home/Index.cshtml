@@ -15,12 +15,24 @@
 		<td>
 			@Html.ActionLink("Train", "Train", "Brand", new { id = brand.id, name = brand.Name }, new { @class = "trainBtn" })
 
-			@{
-				string id = "spinner-" + brand.Name;
-			}
-			<img id=@id class="hidden" src="@Url.Content("~/Content/img/spinner-small.gif")" />
+	
 		</td>
-		<td>@Html.ActionLink("Edit", "Edit", "Brand", new { id = brand.id }, null)</td>
+		<td>
+			@{
+				string statusid = "status-" + brand.id;
+				string spinnerid = "spinner-" + brand.id;
+				string downloadGraphLinkid = "download-" + brand.id;
+			}
+			<span id="@statusid"></span>
+
+			@Html.ActionLink("Download Graph", "DownloadGraph", "Brand", new { id = brand.id }, new { @class="hidden", id=downloadGraphLinkid} )
+		
+		
+			<img id="@spinnerid" class="hidden spinner" src="@Url.Content("~/Content/img/spinner-small.gif")" />
+		</td>
+		<td>
+			@Html.ActionLink("Edit", "Edit", "Brand", new { id = brand.id }, null)
+		</td>
 		<td>
 			@Html.ActionLink("Delete", "Delete", "Brand", new { id = brand.id }, null)
 		</td>
@@ -29,13 +41,11 @@
 	}
 	<tr>
 		<td>@Html.ActionLink("New", "New", "Brand")</td>
-		<td><a class="test-ajax">test ajax</a></td>
-		<td><span class="test-ajax-output"></span></td>
-		<td></td>
+	
 	</tr>
 </table>
 
-<div class="container-fluid-nopad">
+@*<div class="container-fluid-nopad">
 
 
 	<div class="row">
@@ -44,4 +54,4 @@
 		</div>
 
 	</div>
-</div>
+</div>*@

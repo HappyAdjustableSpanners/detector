@@ -5,6 +5,7 @@ using System.Web;
 using System.Web.Mvc;
 using Detector.Models;
 using Detector.ViewModels;
+using Microsoft.AspNet.Identity;
 
 namespace Detector.Controllers
 {
@@ -15,7 +16,8 @@ namespace Detector.Controllers
         public ApplicationDbContext _context = new ApplicationDbContext();
         public ViewResult Index()
         {
-            var brands = _context.brands.ToList();
+            string userId = User.Identity.GetUserId();
+            var brands = _context.brands.Where(b => b.userId == userId).ToList();
 
             var viewModel = new HomeViewModel
             {

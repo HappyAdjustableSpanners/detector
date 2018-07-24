@@ -307,5 +307,6 @@ for i in range(0, len(images)):
 
         SaveAnnotation(outputDir, tree, i * numaugs + j )
         cv2.imwrite(outputDir + str(idx) + ".jpg", imagetosave)
+        cv2.imwrite(outputDir + "debug/" + str(idx) + ".jpg", image_before)
     
 

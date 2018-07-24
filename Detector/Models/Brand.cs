@@ -11,7 +11,7 @@ namespace Detector.Models
     public class Brand
     {
         public int id { get; set; }
-
+        public string userId { get; set; }
         [Required]
         [StringLength(50)]
         //[Remote("IsNameExists", "Brand", AdditionalFields="id", ErrorMessage = "A brand already exists with this name")]
