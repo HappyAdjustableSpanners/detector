@@ -25,6 +25,7 @@ namespace Detector.Controllers
             return View("BrandForm");
         }
 
+
         [HttpPost]
         public ActionResult Save(Brand brand)
         {
@@ -142,20 +143,7 @@ namespace Detector.Controllers
             }
         }
 
-        private void killProcessesForBrand(int brandId)
-        {
-            string workingDir = String.Format("/Storage/{0}/data", brandId);
-            var processes = Process.GetProcessesByName("pythonw");
-            foreach ( var proc in processes) 
-            {
-               
-                if(proc.StartInfo.WorkingDirectory.ToString().Contains(workingDir))
-                {
-                    proc.Kill();
-                    
-                }
-            }
-        }
+     
 
         private void run_python_cmd(string cmd, string args, int brandId, string workingDir = "")
         {
@@ -174,7 +162,15 @@ namespace Detector.Controllers
             using (Process process = Process.Start(start))
             {
 
-                AddBrandProcess(brandId, process.Id);
+                // store process against brand id
+                BrandJob brandJob = new BrandJob();
+                brandJob.jobId = process.Id;
+                brandJob.brandId = brandId;
+                brandJob.cmd = cmd;
+
+                _context.brandJobs.Add(brandJob);
+                _context.SaveChanges();
+
                 //process.StartInfo.Verb = "test";
                 //using (StreamReader reader = process.StandardOutput)
                 //{
@@ -191,11 +187,7 @@ namespace Detector.Controllers
             }
         }
 
-        private void AddBrandProcess(int brandId, int processId)
-        {
-           // BrandProcess brandProcess = new BrandProcess();
-            //brandProcess
-        }
+    
 
         public JsonResult Status()
         {
@@ -284,42 +276,34 @@ namespace Detector.Controllers
             var job3 = GenerateTFRecords(id, name, job2);
             var job4 = StartTraining(id, job3);
             var job5 = ExportGraph(id, job4);
-            AddBrandJob(job1, id);
-           
-            AddBrandJob(job2, id);
-            AddBrandJob(job3, id);
-            AddBrandJob(job4, id);
-            AddBrandJob(job5, id);
 
             return RedirectToAction("Index", "Home");
         }
 
         private void StopJobsForBrand(int brandId)
         {
-            killProcessesForBrand(brandId);
-
-            // get all jobs for a brand
+            // get all processes with this brand id
             List<BrandJob> jobs = _context.brandJobs.Where(j => j.brandId == brandId).ToList();
 
-            // destroy their background jobs and remove them from brandjob table
+            // kill all processes
             foreach (BrandJob j in jobs)
             {
-                BackgroundJob.Delete(j.jobId);
-                
+
+                if(ProcessExists(j.jobId))
+                {
+                    Process.GetProcessById(j.jobId).Kill();
+                }
                 _context.brandJobs.Remove(j);
+                _context.SaveChanges();
             }
-
-            _context.SaveChanges();
         }
 
-        private void AddBrandJob(string jobId, int brandId)
+        private bool ProcessExists(int id)
         {
-            var brandJob = new BrandJob();
-            brandJob.brandId = brandId;
-            brandJob.jobId = jobId;
-            _context.brandJobs.Add(brandJob);
-            _context.SaveChanges();
+            return Process.GetProcesses().Any(x => x.Id == id);
         }
+
+
 
         private void ClearDir(string directory, bool recursive = true)
         {
@@ -338,9 +322,7 @@ namespace Detector.Controllers
                         dir.Delete(true);
                     }
                 }
-            }
-
-            
+            }       
         }
       
         private void CreateLabelPbTextFile(string brandName, int id)
@@ -395,7 +377,7 @@ namespace Detector.Controllers
 
         private string ExportGraph(int id, string lastJob)
         {
-            int numSteps = 10;
+            int numSteps = 10000;
             string cmd = Server.MapPath("~/tf_model/research/object_detection/export_inference_graph.py");
             string workingDir = Server.MapPath(String.Format("~/Storage/{0}/data", id));
             string args = String.Format("--input_type image_tensor --pipeline_config_path training/faster_rcnn_inception_v2_coco.config --trained_checkpoint_prefix trainingoutput/model.ckpt-{0} --output_directory graph", numSteps.ToString());
@@ -437,10 +419,23 @@ namespace Detector.Controllers
             // also remove stored data for that brand
             string path = Server.MapPath(String.Format("~/Storage/{0}/", id));
             ClearDir(path, true);
-            Directory.Delete(path, true);
+            DeleteDir(path);
+           
+
 
 
             return RedirectToAction("Index", "Home");
+        }
+
+        public void DeleteDir(string path)
+        {
+            System.Threading.Timer timer = null;
+            timer = new System.Threading.Timer((obj) =>
+            {
+                Directory.Delete(path, true);
+                timer.Dispose();
+            },
+                        null, 10000, System.Threading.Timeout.Infinite);
         }
 
         public ActionResult Edit(int id)

@@ -219,9 +219,12 @@ for i in range(0, len(images)):
         y2s_out = []
         myBB = []
         bbs = ia.BoundingBoxesOnImage(myBB, shape=image.shape)
-        for b in range(0, len(x1s)):
-            myBB.append(ia.BoundingBox(x1=x1s[b], y1=y1s[b], x2=x2s[b], y2=y2s[b]))
-        bbs = ia.BoundingBoxesOnImage(myBB, shape=image.shape)
+        try:
+            for b in range(0, len(x1s)):
+                myBB.append(ia.BoundingBox(x1=x1s[b], y1=y1s[b], x2=x2s[b], y2=y2s[b]))
+            bbs = ia.BoundingBoxesOnImage(myBB, shape=image.shape)
+        except:
+            print("Error generating bounding boxes, there is likely a labelling error")
 
         # Make our sequence deterministic.
         # We can now apply it to the image and then to the BBs and it will
@@ -307,6 +310,6 @@ for i in range(0, len(images)):
 
         SaveAnnotation(outputDir, tree, i * numaugs + j )
         cv2.imwrite(outputDir + str(idx) + ".jpg", imagetosave)
-        cv2.imwrite(outputDir + "debug/" + str(idx) + ".jpg", image_before)
+        cv2.imwrite(outputDir + "debug/" + str(idx) + ".jpg", image_after)
     
 

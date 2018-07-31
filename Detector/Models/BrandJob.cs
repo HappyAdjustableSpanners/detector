@@ -9,6 +9,7 @@ namespace Detector.Models
     {
         public int id { get; set; }
         public int brandId { get; set; }
-        public string jobId { get; set; }
+        public int jobId { get; set; }
+        public string cmd { get; set; }
     }
 }
